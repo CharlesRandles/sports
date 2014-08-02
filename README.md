@@ -5,10 +5,15 @@ Sports Tracker
 
 Done:
 I want a Location object to store a point in spacetime
+
 I want a Path object to store a list of Locations
+
 I want a function to tell the spatial distance between two Locations
+
 I want a function to tell me the length of a Path
+
 I want to be able to find out how far I climbed or descended
+
 I want to be able to parse a .gpx file into a Path
 
 Backlog:
