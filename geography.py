@@ -5,7 +5,8 @@ RADIUS = 6371000 # Earth, in metres
 DISTANCE_ERROR = 0.001 #1 millimeter
 
 from math import sin, cos, tan, atan2, degrees, radians, sqrt, pi
-from pairfold import pairfoldp
+from pairfold import pairfoldp, pairs
+import datetime
 
 #Exceptions
 class RangeException(Exception):
@@ -18,7 +19,6 @@ def checkRange(val, minimum, maximum):
     else:
         raise RangeException("%.2f not between %.2f and %.2f" 
                              % (val, minimum, maximum))
-
 def sq(x):
     return x * x
 
@@ -50,6 +50,11 @@ def posAltDiff(p1,p2):
 def negAltDiff(p1,p2):
     return min(altDiff(p1,p2), 0.0)
 
+"""A time/distance split"""
+class Split:
+    def __init__(self, time, distance):
+        self.time = time
+        self.distance = distance
 
 """A location on the surface of the earth"""
 class Location:
@@ -104,8 +109,10 @@ class Path():
     def __init__(self, p=None):
         if p==None:
             self.path=[]
+            self._splits=[]
         else:
             self.path=p
+            self._splits=self.calcSplits()
     def getPath(self):
         return self.path
     def append(self,p):
@@ -114,6 +121,47 @@ class Path():
         return len(self.path)
     def __getitem__(self, n):
         return self.path[n]
+
+    """Cumulative time/distances"""
+    def calcSplits(self):
+        splits=[]
+        totTime = datetime.timedelta(0)
+        totDist = 0
+        locPairs = pairs(self.path)
+        for p in locPairs:
+            totTime = totTime + (p[1].time - p[0].time)
+            totDist = totDist + distance(p[1], p[0])
+            splits.append(Split(totTime, totDist))
+        return splits
+
+    def splits(self): #Might memoize this
+        return self.calcSplits()
+    
+    """Given a distance, return the first time
+    that distance is exceeded"""
+    def splitTime(self, distance):
+        ss=self.splits()
+        for s in ss:
+            if s.distance >= distance:
+                return s.time
+        #No split found
+        return 0
+
+    """Return a list of split times at kms"""
+    def distSplits(self, metres=1000):
+        kmSplits=[]
+        for km in range(1, int(self.pathLength()/metres)):
+            kmSplits.append(self.splitTime(km * metres))
+        return kmSplits
+
+    def distSplitsAbsolute(self, metres=1000):
+        kmSplitsAbs=[]
+        lastTime=datetime.timedelta()
+        for km in range(1, int(self.pathLength()/metres)):
+            st=self.splitTime(km * metres)
+            kmSplitsAbs.append(st - lastTime)
+            lastTime=st
+        return kmSplitsAbs
 
     """How far did we go?"""
     def pathLength(self):
@@ -193,7 +241,7 @@ class TestPaths(unittest.TestCase):
     
     def testPairDistance(self):
         self.assertEqual(pairDistance((self.loc1, self.loc2)),
-                         distance(self.loc1,self.loc2))
+                         distance(loc1,loc2))
 
     def testClimbs(self):
         self.assertEqual(self.nullPath.climb(), 0.0)
